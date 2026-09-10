@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.firebase/
+.firebase-debug.log
+*.log
+coverage/
+.DS_Store
+.vscode/settings.json
+service-account*.json

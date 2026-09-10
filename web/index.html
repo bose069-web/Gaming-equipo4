@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gaming Catalog</title>
+  <style>
+    :root { font-family: Georgia, 'Times New Roman', serif; color: #17221d; background: #e9eee8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1180px; margin: auto; padding: 64px 24px; }
+    header { border-bottom: 1px solid #aeb9ad; padding-bottom: 44px; }
+    .eyebrow { color: #b34a2c; font: 700 12px Arial, sans-serif; letter-spacing: 2px; }
+    h1 { max-width: 700px; margin: 18px 0 12px; font-size: clamp(42px, 7vw, 88px); line-height: .94; font-weight: 500; }
+    .intro { color: #536258; font: 18px/1.5 Arial, sans-serif; }
+    .toolbar { display: flex; gap: 12px; padding: 28px 0 8px; }
+    input { flex: 1; min-width: 0; padding: 14px 16px; border: 1px solid #aeb9ad; border-radius: 4px; background: #f7f8f2; font: 15px Arial, sans-serif; }
+    .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 22px; padding-top: 24px; }
+    .game { overflow: hidden; background: #f7f8f2; border: 1px solid #c7d0c5; border-radius: 6px; }
+    .game img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #c7d0c5; }
+    .game-body { padding: 18px; }
+    h2 { margin: 0 0 12px; font-size: 24px; font-weight: 500; }
+    .meta { margin: 0 0 14px; color: #68756b; font: 14px Arial, sans-serif; }
+    strong { color: #b34a2c; font: 700 14px Arial, sans-serif; }
+    @media (max-width: 560px) { main { padding: 36px 18px; } .toolbar { flex-wrap: wrap; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">GAMING CATALOG / PREVIEW</p>
+      <h1>Tu biblioteca, bajo tu control.</h1>
+      <p class="intro">Una vista de prueba del catalogo. Esta pagina funciona directamente desde el navegador.</p>
+    </header>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Buscar un juego..." aria-label="Buscar un juego">
+    </div>
+    <section id="catalog" class="catalog" aria-label="Catalogo de juegos"></section>
+  </main>
+  <script>
+    const games = [
+      { name: 'The Witcher 3: Wild Hunt', released: '2015', rating: 4.7, image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1wyy.jpg' },
+      { name: 'Red Dead Redemption 2', released: '2018', rating: 4.6, image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1q1f.jpg' },
+      { name: 'Hades', released: '2020', rating: 4.5, image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co2g1d.jpg' },
+      { name: 'Hollow Knight', released: '2017', rating: 4.4, image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1rgi.jpg' },
+      { name: 'Elden Ring', released: '2022', rating: 4.6, image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co4jni.jpg' },
+      { name: 'Celeste', released: '2018', rating: 4.4, image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1tmu.jpg' }
+    ];
+    const catalog = document.querySelector('#catalog');
+    const search = document.querySelector('#search');
+    function render() {
+      const term = search.value.trim().toLowerCase();
+      catalog.innerHTML = games.filter(game => game.name.toLowerCase().includes(term)).map(game => `
+        <article class="game">
+          <img src="${game.image}" alt="Portada de ${game.name}" loading="lazy">
+          <div class="game-body"><h2>${game.name}</h2><p class="meta">Lanzamiento: ${game.released}</p><strong>Rating ${game.rating.toFixed(1)}</strong></div>
+        </article>`).join('');
+    }
+    search.addEventListener('input', render);
+    render();
+  </script>
+</body>
+</html>
