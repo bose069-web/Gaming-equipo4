@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: gaming-catalog-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+
+  - type: web
+    name: gaming-catalog-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
