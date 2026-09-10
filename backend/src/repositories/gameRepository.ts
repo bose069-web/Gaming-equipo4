@@ -25,6 +25,18 @@ export async function findGameById(id: string): Promise<Game | null> {
   return document.exists ? toGame(document.id, document.data() ?? {}) : null;
 }
 
+export async function searchGames(search: string, limit: number): Promise<Game[]> {
+  const normalizedSearch = search.trim();
+  const snapshot = await getDatabase()
+    .collection(collectionName)
+    .orderBy('name')
+    .startAt(normalizedSearch)
+    .endAt(`${normalizedSearch}\uf8ff`)
+    .limit(limit)
+    .get();
+  return snapshot.docs.map((document) => toGame(document.id, document.data()));
+}
+
 export async function findTopRatedGames(limit: number): Promise<Game[]> {
   const snapshot = await getDatabase().collection(collectionName).orderBy('rating', 'desc').limit(limit).get();
   return snapshot.docs.map((document) => toGame(document.id, document.data()));

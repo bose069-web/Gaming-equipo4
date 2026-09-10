@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { findGameById, findTopRatedGames, listGames } from '../repositories/gameRepository.js';
+import { findGameById, findTopRatedGames, listGames, searchGames } from '../repositories/gameRepository.js';
 
 const router = Router();
 const listQuery = z.object({
@@ -30,7 +30,7 @@ router.get('/top-rated', async (request, response, next) => {
 router.get('/search', async (request, response, next) => {
   try {
     const query = listQuery.extend({ search: z.string().trim().min(1) }).parse(request.query);
-    response.json({ data: await listGames(query), meta: query });
+    response.json({ data: await searchGames(query.search, query.limit), meta: query });
   } catch (error) {
     next(error);
   }
