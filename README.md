@@ -40,6 +40,17 @@ Si no puedes instalar Node.js, abre `web/index.html` directamente en el navegado
 
 El frontend usa `VITE_API_URL` y por defecto apunta a `http://localhost:3000`.
 
+## Despliegue publico
+
+El archivo `render.yaml` define dos servicios:
+
+- `gaming-catalog-api`: backend Node/Express.
+- `gaming-catalog-frontend`: frontend React estatico.
+
+Para publicarlos, crea una cuenta en Render, selecciona **New > Blueprint**, conecta este repositorio y elige la rama `develop`. En el servicio `gaming-catalog-api`, configura el secreto `FIREBASE_SERVICE_ACCOUNT_JSON` pegando el contenido completo del JSON de cuenta de servicio. No lo subas a GitHub.
+
+Render publicara el frontend en una URL accesible para el equipo y el frontend usara la URL publica del backend definida en `render.yaml`.
+
 ## Firebase
 
 Configura las credenciales de Firebase Admin en `backend/.env`. No subas claves privadas al repositorio.

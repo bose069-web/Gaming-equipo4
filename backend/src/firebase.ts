@@ -15,7 +15,20 @@ export function getDatabase(): Firestore {
       : resolve(process.cwd(), '..', env.FIREBASE_SERVICE_ACCOUNT_PATH)
     : undefined;
 
-  const credential = serviceAccountPath
+  const credential = env.FIREBASE_SERVICE_ACCOUNT_JSON
+    ? (() => {
+        const serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON) as {
+          project_id: string;
+          client_email: string;
+          private_key: string;
+        };
+        return {
+          projectId: serviceAccount.project_id,
+          clientEmail: serviceAccount.client_email,
+          privateKey: serviceAccount.private_key
+        };
+      })()
+    : serviceAccountPath
     ? (() => {
         const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8')) as {
           project_id: string;
