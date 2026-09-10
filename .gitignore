@@ -10,3 +10,4 @@ coverage/
 .DS_Store
 .vscode/settings.json
 service-account*.json
+credentials/
