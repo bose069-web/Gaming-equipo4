@@ -5,7 +5,6 @@ services:
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
-    plan: free
 
   - type: web
     name: gaming-catalog-frontend
@@ -13,4 +12,3 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    plan: free
