@@ -5,9 +5,10 @@ import { resolve } from 'node:path';
 import { env } from './config.js';
 
 let database: Firestore | undefined;
+let adminApp = getApps()[0];
 
-export function getDatabase(): Firestore {
-  if (database) return database;
+export function getAdminApp() {
+  if (adminApp) return adminApp;
 
   const serviceAccountPath = env.FIREBASE_SERVICE_ACCOUNT_PATH
     ? existsSync(resolve(process.cwd(), env.FIREBASE_SERVICE_ACCOUNT_PATH))
@@ -51,10 +52,13 @@ export function getDatabase(): Firestore {
 
   if (!credential) throw new Error('Firebase Admin no esta configurado. Revisa backend/.env.');
 
-  const app = getApps()[0] ?? initializeApp({
-    credential: cert(credential)
-  });
+  adminApp = initializeApp({ credential: cert(credential) });
+  return adminApp;
+}
 
-  database = getFirestore(app);
+export function getDatabase(): Firestore {
+  if (database) return database;
+
+  database = getFirestore(getAdminApp());
   return database;
 }
