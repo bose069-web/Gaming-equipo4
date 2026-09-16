@@ -1,6 +1,6 @@
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth, type User } from 'firebase/auth';
-import { doc, getDoc, getFirestore, serverTimestamp, setDoc, updateDoc, type Firestore } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, getFirestore, serverTimestamp, setDoc, updateDoc, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -44,13 +44,14 @@ export function getFirebaseFirestore(): Firestore | null {
 
 export async function saveUserProfile(user: User, hasVerifiedEmail: boolean): Promise<void> {
   const firestore = getFirebaseFirestore();
-  if (!firestore) return;
+  if (!firestore || !hasVerifiedEmail || !user.emailVerified || !user.email) return;
 
   const profileReference = doc(firestore, 'users', user.uid);
   await setDoc(profileReference, {
     uid: user.uid,
     email: user.email ?? '',
     displayName: user.displayName ?? '',
+    fullName: user.displayName ?? '',
     emailVerified: hasVerifiedEmail,
     lastLoginAt: serverTimestamp()
   }, { merge: true });
@@ -60,6 +61,7 @@ export interface UserProfileData {
   uid: string;
   email: string;
   displayName: string;
+  fullName?: string;
   emailVerified: boolean;
   registeredAt?: unknown;
   lastLoginAt?: unknown;
@@ -67,6 +69,8 @@ export interface UserProfileData {
   favoritePlatform?: string;
   favoriteGenre?: string;
   favoriteGame?: string;
+  avatarImage?: string;
+  avatarColor?: string;
   favoriteGames?: string[];
   savedGames?: string[];
   recentlyViewedGames?: string[];
@@ -83,25 +87,17 @@ export async function getUserProfile(uid: string): Promise<UserProfileData | nul
   return snapshot.data() as UserProfileData;
 }
 
-export async function updateUserProfile(uid: string, data: Partial<Pick<UserProfileData, 'displayName' | 'bio' | 'favoritePlatform' | 'favoriteGenre' | 'favoriteGame' | 'favoriteGames' | 'savedGames' | 'recentlyViewedGames'>>): Promise<void> {
+export async function deleteUserProfile(uid: string): Promise<void> {
+  const firestore = getFirebaseFirestore();
+  if (!firestore) return;
+
+  await deleteDoc(doc(firestore, 'users', uid));
+}
+
+export async function updateUserProfile(uid: string, data: Partial<Pick<UserProfileData, 'displayName' | 'fullName' | 'bio' | 'favoritePlatform' | 'favoriteGenre' | 'favoriteGame' | 'avatarImage' | 'avatarColor' | 'favoriteGames' | 'savedGames' | 'recentlyViewedGames'>>): Promise<void> {
   const firestore = getFirebaseFirestore();
   if (!firestore) return;
 
   const profileReference = doc(firestore, 'users', uid);
   await updateDoc(profileReference, data);
-}
-
-export async function markUserRegistration(user: User): Promise<void> {
-  const firestore = getFirebaseFirestore();
-  if (!firestore) return;
-
-  const profileReference = doc(firestore, 'users', user.uid);
-  await setDoc(profileReference, {
-    uid: user.uid,
-    email: user.email ?? '',
-    displayName: user.displayName ?? '',
-    emailVerified: user.emailVerified,
-    registeredAt: serverTimestamp(),
-    lastLoginAt: serverTimestamp()
-  }, { merge: true });
 }

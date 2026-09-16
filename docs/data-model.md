@@ -39,6 +39,7 @@ Cada usuario autenticado tiene un documento en `users/{uid}`. El `uid` coincide 
 | `uid` | string | sí | Identificador de Firebase Auth. |
 | `email` | string | sí | Correo de la cuenta. |
 | `displayName` | string | sí | Nombre visible del usuario. |
+| `fullName` | string | no | Nombre personal introducido durante el registro y editable desde el perfil. |
 | `emailVerified` | boolean | sí | Estado de verificación del correo. |
 | `registeredAt` | timestamp | no | Momento del registro. |
 | `lastLoginAt` | timestamp | no | Último inicio de sesión registrado. |
@@ -46,6 +47,8 @@ Cada usuario autenticado tiene un documento en `users/{uid}`. El `uid` coincide 
 | `favoritePlatform` | string | no | Plataforma favorita. |
 | `favoriteGenre` | string | no | Género favorito. |
 | `favoriteGame` | string | no | Juego favorito escrito por el usuario. |
+| `avatarImage` | string | no | URL de imagen o imagen local convertida a Data URL. |
+| `avatarColor` | string | no | Color hexadecimal de la burbuja cuando no se usa imagen. |
 | `savedGames` | string[] | no | IDs de juegos guardados. |
 | `favoriteGames` | string[] | no | IDs de juegos favoritos. |
 | `recentlyViewedGames` | string[] | no | Hasta 10 IDs abiertos recientemente. |
@@ -62,6 +65,8 @@ Cada usuario autenticado tiene un documento en `users/{uid}`. El `uid` coincide 
   "favoritePlatform": "PC",
   "favoriteGenre": "RPG",
   "favoriteGame": "Chrono Trigger",
+  "avatarImage": "https://example.com/profile-image.jpg",
+  "avatarColor": "#d6ed52",
   "savedGames": ["10001", "10008"],
   "favoriteGames": ["10008"],
   "recentlyViewedGames": ["10008", "10001"]
@@ -73,6 +78,8 @@ Cada usuario autenticado tiene un documento en `users/{uid}`. El `uid` coincide 
 - `games` es catálogo compartido y de solo lectura para la aplicación.
 - `users/{uid}` es privado y pertenece únicamente al usuario cuyo `uid` coincide.
 - Las listas personales guardan IDs, no copias completas de juegos.
+- `avatarImage` puede ser un enlace externo o una imagen local pequeña guardada como Data URL.
+- Las imágenes locales se limitan a 300 KB para no hacer crecer demasiado el documento de Firestore.
 - Si un juego desaparece del catálogo, su ID puede permanecer temporalmente en una lista personal; la interfaz usa el ID como fallback.
 
 ## 4. Normalización del backend

@@ -19,7 +19,7 @@ Por ahora todo el proyecto se ejecuta en local: no hay despliegue activo ni cont
 - El perfil se presenta como una burbuja sin avatar, con iniciales o símbolo de marca, y se puede abrir desde el header cuando la sesión está activa.
 - La vista de perfil tiene pestañas para `Datos`, `Guardados` y `Historial`.
 - El usuario puede guardar juegos, marcarlos como favoritos y ver un historial reciente de juegos abiertos.
-- El frontend escribe y lee un perfil de usuario en la colección `users` de Firestore al registrarse y al iniciar sesión con correo verificado.
+- El frontend crea y lee el perfil de usuario en la colección `users` de Firestore únicamente después de iniciar sesión con correo verificado.
 - La cuenta de inicio de sesión se ve en Firebase Authentication, y el perfil de usuario se ve en Firestore dentro de `users/{uid}`.
 
 ## Vista general
@@ -166,6 +166,7 @@ Campos principales del perfil `users/{uid}`:
 - `uid`: identificador del usuario autenticado.
 - `email`: correo usado para el acceso.
 - `displayName`: nombre visible.
+- `fullName`: nombre personal editable, separado del nombre público.
 - `emailVerified`: estado de verificación.
 - `registeredAt`: fecha de alta.
 - `lastLoginAt`: fecha del último acceso.
@@ -173,6 +174,8 @@ Campos principales del perfil `users/{uid}`:
 - `favoritePlatform`: plataforma favorita.
 - `favoriteGenre`: género favorito.
 - `favoriteGame`: juego favorito.
+- `avatarImage`: enlace externo o imagen local pequeña para la burbuja.
+- `avatarColor`: color de la paleta por defecto cuando no hay imagen.
 - `savedGames`: lista de IDs guardados.
 - `favoriteGames`: lista de IDs favoritos.
 - `recentlyViewedGames`: lista de IDs vistos recientemente.
@@ -239,9 +242,11 @@ La interfaz del catálogo ya no intenta cargar toda la biblioteca de golpe. En s
 
 La vista de perfil evita cualquier avatar fijo. La burbuja se construye con letras derivadas del nombre o del correo, y el contenido se organiza en pestañas:
 
-- `Datos`: nombre público, biografía y gustos principales;
+- `Datos`: nombre público, nombre personal, biografía y gustos principales;
 - `Guardados`: juegos guardados y favoritos;
 - `Historial`: juegos abiertos recientemente.
+
+La burbuja puede usar las iniciales por defecto, un color de la paleta integrada, un enlace de imagen o una imagen local. Las imágenes locales se convierten en Data URL y se limitan a 300 KB; no se añade un servicio de almacenamiento separado.
 
 Cada tarjeta de juego incluye acciones para:
 

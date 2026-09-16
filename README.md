@@ -244,11 +244,12 @@ Para ver solo la preview estática, abre [web/index.html](web/index.html) direct
 2. Al abrir `Iniciar sesión`, puede entrar, registrarse, recuperar la contraseña o consultar cookies.
 3. Al registrarse, Firebase crea la cuenta y envía un correo de verificación.
 4. El usuario confirma el correo y vuelve a iniciar sesión.
-5. El backend acepta el token solo si el correo está verificado.
-6. La biblioteca se carga en páginas de 20 juegos.
-7. Las tarjetas permiten guardar juegos o marcarlos como favoritos.
-8. `Ver ficha` actualiza los 10 juegos más recientes del historial.
-9. La burbuja del header abre el perfil con las pestañas `Datos`, `Guardados` e `Historial`.
+5. El perfil `users/{uid}` se crea solo después de verificar el correo.
+6. El backend acepta el token solo si el correo está verificado.
+7. La biblioteca se carga en páginas de 20 juegos.
+8. Las tarjetas permiten guardar juegos o marcarlos como favoritos.
+9. `Ver ficha` actualiza los 10 juegos más recientes del historial.
+10. La burbuja del header abre el perfil con las pestañas `Datos`, `Guardados` e `Historial`.
 
 ## Documentación técnica
 

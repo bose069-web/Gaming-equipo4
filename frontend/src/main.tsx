@@ -1,4 +1,4 @@
-import { FormEvent, StrictMode, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   createUserWithEmailAndPassword,
@@ -11,7 +11,7 @@ import {
   updateProfile,
   type User
 } from 'firebase/auth';
-import { getFirebaseAuth, getMissingFirebaseAuthConfig, getUserProfile, markUserRegistration, saveUserProfile, updateUserProfile, type UserProfileData } from './firebase.js';
+import { deleteUserProfile, getFirebaseAuth, getMissingFirebaseAuthConfig, getUserProfile, saveUserProfile, updateUserProfile, type UserProfileData } from './firebase.js';
 import './styles.css';
 
 type AuthView = 'login' | 'signup' | 'forgot' | 'cookies' | 'profile';
@@ -33,10 +33,13 @@ interface SessionNotice {
 
 interface ProfileDraft {
   displayName: string;
+  fullName: string;
   bio: string;
   favoritePlatform: string;
   favoriteGenre: string;
   favoriteGame: string;
+  avatarImage: string;
+  avatarColor: string;
 }
 
 interface ProfileCollections {
@@ -47,11 +50,36 @@ interface ProfileCollections {
 
 const emptyProfileDraft: ProfileDraft = {
   displayName: '',
+  fullName: '',
   bio: '',
   favoritePlatform: '',
   favoriteGenre: '',
-  favoriteGame: ''
+  favoriteGame: '',
+  avatarImage: '',
+  avatarColor: '#d6ed52'
 };
+
+const avatarPaletteRows = [
+  [
+    { value: '#d6ed52', label: 'Lima' },
+    { value: '#8dd3ff', label: 'Azul' },
+    { value: '#ff9f68', label: 'Coral' },
+    { value: '#d8a7ff', label: 'Lila' },
+    { value: '#83e6bd', label: 'Menta' }
+  ],
+  [
+    { value: '#ffe66d', label: 'Amarillo' },
+    { value: '#9b8cff', label: 'Violeta' },
+    { value: '#ff7aa2', label: 'Rosa' },
+    { value: '#54d6c7', label: 'Turquesa' },
+    { value: '#f2f1e9', label: 'Blanco' }
+  ],
+  [
+    { value: 'linear-gradient(135deg, #d6ed52 0 50%, #dc6947 50% 100%)', label: 'Lima y coral' },
+    { value: 'linear-gradient(135deg, #8dd3ff 0 50%, #d8a7ff 50% 100%)', label: 'Azul y lila' }
+  ]
+];
+const defaultAvatarColor = avatarPaletteRows[0][0].value;
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
 const firebaseAuth = getFirebaseAuth();
@@ -112,6 +140,7 @@ function App() {
   const [authToken, setAuthToken] = useState('');
   const [authReady, setAuthReady] = useState(false);
   const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(null);
+  const [cookieConsent, setCookieConsent] = useState(() => window.localStorage.getItem('gamingcloude-cookie-consent') === 'accepted');
   const [profileData, setProfileData] = useState<UserProfileData | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -160,6 +189,10 @@ function App() {
 
       await reload(user);
       if (!user.emailVerified) {
+        try {
+          await deleteUserProfile(user.uid);
+        } catch {
+        }
         setAuthUser(null);
         setAuthToken('');
         setProfileData(null);
@@ -248,6 +281,15 @@ function App() {
     window.location.hash = 'auth';
   }
 
+  function handleCookieConsent(nextConsent: boolean) {
+    setCookieConsent(nextConsent);
+    if (nextConsent) {
+      window.localStorage.setItem('gamingcloude-cookie-consent', 'accepted');
+    } else {
+      window.localStorage.removeItem('gamingcloude-cookie-consent');
+    }
+  }
+
   const gamesById = useMemo(() => new Map(games.map((game) => [game.id, game])), [games]);
 
   async function persistProfileCollections(nextCollections: ProfileCollections) {
@@ -290,13 +332,14 @@ function App() {
     await signOut(firebaseAuth);
     setAuthView('login');
     setProfileData(null);
-    setSessionNotice({ kind: 'info', text: 'Has cerrado la sesión.' });
+    setSessionNotice(null);
     window.location.hash = 'auth';
   }
 
   const catalogUnlocked = authReady && Boolean(authUser && authToken);
   const shuffledFeaturedGames = useMemo(() => pickFeaturedGames(featuredGames, 2, heroSeed), [featuredGames, heroSeed]);
   const profileBubbleLabel = getProfileBubbleLabel(profileData ?? undefined, authUser?.displayName ?? null, authUser?.email ?? null);
+  const profileDisplayName = profileData?.displayName?.trim() || authUser?.displayName?.trim() || 'Perfil';
 
   return (
     <div className="site-shell">
@@ -304,10 +347,11 @@ function App() {
         onOpenAuth={goToAuth}
         onGoHome={goToCatalog}
         onOpenProfile={goToProfile}
-        onSignOut={handleSignOut}
         isAuthenticated={catalogUnlocked}
-        userEmail={authUser?.email ?? null}
+        profileDisplayName={profileDisplayName}
         profileBubbleLabel={profileBubbleLabel}
+        profileImage={profileData?.avatarImage}
+        profileColor={profileData?.avatarColor}
       />
       {page === 'auth' ? (
         <AuthPage
@@ -330,10 +374,13 @@ function App() {
               await updateProfile(authUser, { displayName: draft.displayName.trim() || null });
               await updateUserProfile(authUser.uid, {
                 displayName: draft.displayName.trim(),
+                fullName: draft.fullName.trim(),
                 bio: draft.bio.trim(),
                 favoritePlatform: draft.favoritePlatform.trim(),
                 favoriteGenre: draft.favoriteGenre.trim(),
                 favoriteGame: draft.favoriteGame.trim(),
+                avatarImage: draft.avatarImage.trim(),
+                avatarColor: draft.avatarColor,
                 savedGames: profileCollections.savedGames,
                 favoriteGames: profileCollections.favoriteGames,
                 recentlyViewedGames: profileCollections.recentlyViewedGames
@@ -351,6 +398,9 @@ function App() {
               setProfileSaving(false);
             }
           }}
+          onSignOut={handleSignOut}
+          cookieConsent={cookieConsent}
+          onCookieConsentChange={handleCookieConsent}
           missingFirebaseAuthConfig={missingFirebaseAuthConfig}
         />
       ) : (
@@ -383,8 +433,37 @@ function App() {
           </section>
         </main>
       )}
-      {page === 'catalog' ? <footer><span>GAMING CATALOG</span><span>Firestore / RAWG / 2026</span></footer> : null}
+      {page === 'catalog' ? <GamingFooter /> : null}
     </div>
+  );
+}
+
+function GamingFooter() {
+  return (
+    <footer className="site-footer">
+      <div className="footer-brand">
+        <p className="footer-kicker">GAMINGCLOUDE / 001</p>
+        <strong>Gaming<span>cloude</span>.</strong>
+        <p>Un archivo vivo para encontrar tu próximo juego.</p>
+      </div>
+      <div className="footer-block">
+        <p className="footer-label">Contacto</p>
+        <a href="mailto:hola@gamingcloude.com">hola@gamingcloude.com</a>
+        <span>Respondemos cuando termine la partida.</span>
+      </div>
+      <div className="footer-block">
+        <p className="footer-label">Redes sociales</p>
+        <div className="footer-socials">
+          <a href="https://facebook.com/gamingcloude" target="_blank" rel="noreferrer"><span className="social-mark social-mark-facebook" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 8h3V4h-3c-3.3 0-5 1.9-5 5v3H6v4h3v8h4v-8h3.2l.8-4H13V9c0-.7.3-1 1-1Z" /></svg></span>Facebook</a>
+          <a href="https://instagram.com/gamingcloude" target="_blank" rel="noreferrer"><span className="social-mark social-mark-instagram" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" className="social-icon-fill" /></svg></span>Instagram</a>
+          <a href="https://tiktok.com/@gamingcloude" target="_blank" rel="noreferrer"><span className="social-mark social-mark-tiktok" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 4v10.2a4.8 4.8 0 1 1-3.8-4.7v3.2a1.7 1.7 0 1 0 .8 1.5V4h3c.4 2 1.6 3.2 3.5 3.7v3c-1.4-.2-2.6-.8-3.5-1.7V14Z" /></svg></span>TikTok</a>
+        </div>
+      </div>
+      <div className="footer-note">
+        <span>CATÁLOGO LOCAL</span>
+        <span>Firestore / RAWG / 2026</span>
+      </div>
+    </footer>
   );
 }
 
@@ -409,20 +488,20 @@ function pickFeaturedGames(games: Game[], count: number, seed: string): Game[] {
   return pool.slice(0, Math.min(count, pool.length));
 }
 
-function Navigation({ onOpenAuth, onGoHome, onOpenProfile, onSignOut, isAuthenticated, userEmail, profileBubbleLabel }: { onOpenAuth: () => void; onGoHome: () => void; onOpenProfile: () => void; onSignOut: () => void; isAuthenticated: boolean; userEmail: string | null; profileBubbleLabel: string; }) {
+function Navigation({ onOpenAuth, onGoHome, onOpenProfile, isAuthenticated, profileDisplayName, profileBubbleLabel, profileImage, profileColor }: { onOpenAuth: () => void; onGoHome: () => void; onOpenProfile: () => void; isAuthenticated: boolean; profileDisplayName: string; profileBubbleLabel: string; profileImage?: string; profileColor?: string; }) {
   return (
     <nav className="navigation" aria-label="Navegacion principal">
-      <button type="button" className="brand brand-button" onClick={onGoHome}>GC<span>.</span></button>
+      <div className="nav-left">
+        <button type="button" className="brand brand-button" onClick={onGoHome}>GC<span>.</span></button>
+      </div>
       <div className="nav-links">
         {isAuthenticated ? null : <a href="#auth" onClick={(event) => { event.preventDefault(); onOpenAuth(); }}>Iniciar sesión</a>}
         <a href="#library">Biblioteca</a>
         <a href="#about">El proyecto</a>
       </div>
       <div className="nav-actions">
-        {isAuthenticated ? <button type="button" className="nav-action" onClick={onSignOut}>Cerrar sesión</button> : null}
-        {userEmail ? <span className="nav-user">{userEmail}</span> : null}
-        {isAuthenticated ? <button type="button" className="profile-bubble" onClick={onOpenProfile} aria-label="Abrir perfil">{profileBubbleLabel}</button> : null}
-        <a className="nav-action nav-action-strong" href="#library">Explorar <span aria-hidden="true">↘</span></a>
+        {isAuthenticated ? <span className="nav-user">{profileDisplayName}</span> : null}
+        {isAuthenticated ? <ProfileBubble className="profile-bubble" label={profileBubbleLabel} image={profileImage} color={profileColor} onClick={onOpenProfile} /> : null}
       </div>
     </nav>
   );
@@ -448,20 +527,19 @@ function Hero({ featuredGames }: { featuredGames: Game[]; }) {
           <span>{secondGame ? secondGame.name : 'CURATED PLAY'}</span>
           <strong>{secondGame?.rating ? Math.round(secondGame.rating).toString() : '24'}</strong>
         </div>
-        <div className="hero-note">+ 5.000<br />titulos<br />indexados</div>
+        <div className="hero-note">+ 1.000<br />titulos<br />indexados</div>
       </div>
     </section>
   );
 }
 
-function AuthPage({ screen, onScreenChange, onBack, auth, sessionNotice, profileData, profileLoading, profileSaving, onProfileSave, gamesById, savedGames, favoriteGames, recentlyViewedGames, missingFirebaseAuthConfig }: { screen: AuthView; onScreenChange: (screen: AuthView) => void; onBack: () => void; auth: typeof firebaseAuth; sessionNotice: SessionNotice | null; profileData: UserProfileData | null; profileLoading: boolean; profileSaving: boolean; onProfileSave: (draft: ProfileDraft) => Promise<void>; gamesById: Map<string, Game>; savedGames: string[]; favoriteGames: string[]; recentlyViewedGames: string[]; missingFirebaseAuthConfig: string[]; }) {
+function AuthPage({ screen, onScreenChange, onBack, auth, sessionNotice, profileData, profileLoading, profileSaving, onProfileSave, onSignOut, cookieConsent, onCookieConsentChange, gamesById, savedGames, favoriteGames, recentlyViewedGames, missingFirebaseAuthConfig }: { screen: AuthView; onScreenChange: (screen: AuthView) => void; onBack: () => void; auth: typeof firebaseAuth; sessionNotice: SessionNotice | null; profileData: UserProfileData | null; profileLoading: boolean; profileSaving: boolean; onProfileSave: (draft: ProfileDraft) => Promise<void>; onSignOut: () => void; cookieConsent: boolean; onCookieConsentChange: (consent: boolean) => void; gamesById: Map<string, Game>; savedGames: string[]; favoriteGames: string[]; recentlyViewedGames: string[]; missingFirebaseAuthConfig: string[]; }) {
   return (
-    <section className="auth-shell auth-shell-split">
+    <section className={screen === 'profile' ? 'auth-shell auth-shell-profile' : 'auth-shell auth-shell-split'}>
       <aside className="auth-visual" aria-label="Marca del proyecto">
         <button type="button" className="auth-visual-brand" onClick={onBack}>
           GC<span>.</span>
         </button>
-        <p className="auth-visual-copy">Tu catálogo de videojuegos, presentado con una interfaz limpia y oscura.</p>
         {missingFirebaseAuthConfig.length > 0 ? <p className="auth-config-warning">Faltan variables de Firebase Auth: {missingFirebaseAuthConfig.join(', ')}</p> : null}
         {sessionNotice ? <p className={`auth-session-note auth-session-note-${sessionNotice.kind}`}>{sessionNotice.text}</p> : null}
       </aside>
@@ -479,10 +557,10 @@ function AuthPage({ screen, onScreenChange, onBack, auth, sessionNotice, profile
         <p className="auth-description auth-description-login">{screen === 'signup' ? 'Crea tu cuenta. Después tendrás que verificar el correo para entrar a la biblioteca.' : screen === 'forgot' ? 'Introduce tu correo y te enviaremos un enlace para recuperar el acceso.' : screen === 'cookies' ? 'Cookies técnicas para el acceso, preferencias de interfaz y, si quieres, analítica básica en el futuro.' : screen === 'profile' ? 'Tu perfil funciona como una burbuja editable con tus datos básicos y tus gustos principales.' : 'Inicia sesión con tu correo verificado para desbloquear la biblioteca.'}</p>
 
         {screen === 'login' ? <LoginView auth={auth} onScreenChange={onScreenChange} onSessionNotice={missingFirebaseAuthConfig.length > 0 ? 'Configura Firebase Auth en las variables VITE_* antes de intentar entrar.' : ''} /> : null}
-        {screen === 'signup' ? <SignupView auth={auth} onScreenChange={onScreenChange} onBack={onBack} /> : null}
+        {screen === 'signup' ? <SignupView auth={auth} onScreenChange={onScreenChange} cookieConsent={cookieConsent} onCookieConsentChange={onCookieConsentChange} /> : null}
         {screen === 'forgot' ? <ForgotView auth={auth} onScreenChange={onScreenChange} /> : null}
-        {screen === 'cookies' ? <CookiesView onScreenChange={onScreenChange} /> : null}
-        {screen === 'profile' ? <ProfileView profileData={profileData} profileLoading={profileLoading} profileSaving={profileSaving} gamesById={gamesById} savedGames={savedGames} favoriteGames={favoriteGames} recentlyViewedGames={recentlyViewedGames} onSave={onProfileSave} onBack={onBack} /> : null}
+        {screen === 'cookies' ? <CookiesView onScreenChange={onScreenChange} cookieConsent={cookieConsent} onCookieConsentChange={onCookieConsentChange} /> : null}
+        {screen === 'profile' ? <ProfileView profileData={profileData} profileLoading={profileLoading} profileSaving={profileSaving} gamesById={gamesById} savedGames={savedGames} favoriteGames={favoriteGames} recentlyViewedGames={recentlyViewedGames} onSave={onProfileSave} onSignOut={onSignOut} onBack={onBack} /> : null}
       </article>
     </section>
   );
@@ -508,13 +586,26 @@ function getAuthErrorMessage(error: unknown): string {
     case 'auth/weak-password':
       return 'La contraseña es demasiado débil.';
     case 'auth/user-not-found':
+      return 'No existe el correo.';
     case 'auth/wrong-password':
-      return 'No se pudo encontrar esa cuenta.';
+      return 'La contraseña no es correcta.';
     case 'auth/missing-password':
       return 'Introduce una contraseña válida.';
     default:
       return 'No se pudo completar la operación.';
   }
+}
+
+function PasswordField({ value, onChange }: { value: string; onChange: (value: string) => void; }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="password-field">
+      <input type={visible ? 'text' : 'password'} value={value} onChange={(event) => onChange(event.target.value)} placeholder="Contraseña" aria-label="Contraseña" />
+      <button type="button" className="password-visibility" onPointerDown={(event) => { event.preventDefault(); setVisible(true); }} onPointerUp={() => setVisible(false)} onPointerLeave={() => setVisible(false)} onPointerCancel={() => setVisible(false)} aria-label="Mantener pulsado para mostrar la contraseña">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></svg>
+      </button>
+    </div>
+  );
 }
 
 function LoginView({ auth, onScreenChange, onSessionNotice }: { auth: typeof firebaseAuth; onScreenChange: (screen: AuthView) => void; onSessionNotice: string; }) {
@@ -547,6 +638,7 @@ function LoginView({ auth, onScreenChange, onSessionNotice }: { auth: typeof fir
 
       try {
         await saveUserProfile(result.user, true);
+        await updateUserProfile(result.user.uid, { fullName: result.user.displayName ?? '' });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'No se pudo guardar el perfil en Firestore';
         setStatus(message);
@@ -570,7 +662,7 @@ function LoginView({ auth, onScreenChange, onSessionNotice }: { auth: typeof fir
         </label>
         <label>
           <span>Contraseña</span>
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Contraseña" aria-label="Contraseña" />
+          <PasswordField value={password} onChange={setPassword} />
         </label>
         <button className="auth-submit auth-submit-login" type="submit" disabled={busy}>{busy ? 'Entrando...' : 'Entrar'}</button>
         {status ? <p className="auth-status">{status}</p> : null}
@@ -581,14 +673,11 @@ function LoginView({ auth, onScreenChange, onSessionNotice }: { auth: typeof fir
         <span className="auth-bottom-spacer"></span>
         <button type="button" className="auth-footer-link auth-footer-link-green" onClick={() => onScreenChange('forgot')}>¿Olvidaste tu contraseña?</button>
       </div>
-      <div className="auth-cookies-inline">
-        <button type="button" className="auth-footer-link auth-footer-link-muted" onClick={() => onScreenChange('cookies')}>Cookies</button>
-      </div>
     </>
   );
 }
 
-function SignupView({ auth, onScreenChange, onBack }: { auth: typeof firebaseAuth; onScreenChange: (screen: AuthView) => void; onBack: () => void; }) {
+function SignupView({ auth, onScreenChange, cookieConsent, onCookieConsentChange }: { auth: typeof firebaseAuth; onScreenChange: (screen: AuthView) => void; cookieConsent: boolean; onCookieConsentChange: (consent: boolean) => void; }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -603,22 +692,20 @@ function SignupView({ auth, onScreenChange, onBack }: { auth: typeof firebaseAut
       return;
     }
 
+    if (!cookieConsent) {
+      setStatus('Debes aceptar las cookies para crear una cuenta.');
+      return;
+    }
+
     setBusy(true);
     setStatus('');
 
     try {
       const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(result.user, { displayName: name.trim() || null });
-      try {
-        await markUserRegistration(result.user);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'No se pudo guardar el perfil en Firestore';
-        setStatus(message);
-        return;
-      }
       await sendEmailVerification(result.user, { url: `${window.location.origin}${window.location.pathname}#auth` });
       await signOut(auth);
-      setStatus('Cuenta creada. Revisa tu correo para verificarla y luego entrar a la biblioteca.');
+      onScreenChange('login');
     } catch (error) {
       setStatus(getAuthErrorMessage(error));
     } finally {
@@ -630,8 +717,8 @@ function SignupView({ auth, onScreenChange, onBack }: { auth: typeof firebaseAut
     <>
       <form className="auth-form auth-form-login" onSubmit={handleSubmit}>
         <label>
-          <span>Nombre completo</span>
-          <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nombre completo" aria-label="Nombre completo" />
+          <span>Nombre personal</span>
+          <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nombre personal" aria-label="Nombre personal" />
         </label>
         <label>
           <span>Correo electrónico</span>
@@ -639,11 +726,12 @@ function SignupView({ auth, onScreenChange, onBack }: { auth: typeof firebaseAut
         </label>
         <label>
           <span>Contraseña</span>
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Contraseña" aria-label="Contraseña" />
+          <PasswordField value={password} onChange={setPassword} />
         </label>
         <label className="checkbox-row checkbox-row-login checkbox-row-top">
-          <input type="checkbox" />
-          <span>Privacidad</span>
+          <input type="checkbox" checked={cookieConsent} onChange={(event) => onCookieConsentChange(event.target.checked)} />
+          <span>Privacidad y cookies aceptadas</span>
+          <button type="button" className="cookie-mini-link" onClick={() => onScreenChange('cookies')}>Ver cookies</button>
         </label>
         <label className="checkbox-row checkbox-row-login checkbox-row-middle">
           <input type="checkbox" />
@@ -659,25 +747,76 @@ function SignupView({ auth, onScreenChange, onBack }: { auth: typeof firebaseAut
       <div className="auth-signup-footer">
         <span className="auth-signup-footer-text">¿Ya tienes una cuenta?</span>
         <button type="button" className="auth-footer-link auth-footer-link-green" onClick={() => onScreenChange('login')}>Inicia sesión</button>
-        <button type="button" className="auth-footer-link auth-footer-link-muted" onClick={onBack}>Saltar por ahora</button>
       </div>
     </>
   );
 }
 
-function ProfileView({ profileData, profileLoading, profileSaving, gamesById, savedGames, favoriteGames, recentlyViewedGames, onSave, onBack }: { profileData: UserProfileData | null; profileLoading: boolean; profileSaving: boolean; gamesById: Map<string, Game>; savedGames: string[]; favoriteGames: string[]; recentlyViewedGames: string[]; onSave: (draft: ProfileDraft) => Promise<void>; onBack: () => void; }) {
+function ProfileBubble({ className, label, image, color, onClick }: { className: string; label: string; image?: string; color?: string; onClick?: () => void; }) {
+  const content = image ? <img src={image} alt="Imagen de perfil" /> : label;
+  const style = image ? undefined : { background: color || '#d6ed52' };
+  return <button type="button" className={className} style={style} onClick={onClick} aria-label="Abrir perfil">{content}</button>;
+}
+
+function ProfileGameItem({ gameId, gamesById }: { gameId: string; gamesById: Map<string, Game>; }) {
+  const game = gamesById.get(gameId);
+  return (
+    <div className="profile-game-item">
+      <div className="profile-game-thumb">
+        {game?.background_image ? <img src={game.background_image} alt={`Portada de ${game.name}`} loading="lazy" /> : <span>GC</span>}
+      </div>
+      <span className="profile-game-name">{game?.name ?? gameId}</span>
+    </div>
+  );
+}
+
+function ProfileView({ profileData, profileLoading, profileSaving, gamesById, savedGames, favoriteGames, recentlyViewedGames, onSave, onSignOut, onBack }: { profileData: UserProfileData | null; profileLoading: boolean; profileSaving: boolean; gamesById: Map<string, Game>; savedGames: string[]; favoriteGames: string[]; recentlyViewedGames: string[]; onSave: (draft: ProfileDraft) => Promise<void>; onSignOut: () => void; onBack: () => void; }) {
   const [draft, setDraft] = useState<ProfileDraft>(emptyProfileDraft);
   const [activeTab, setActiveTab] = useState<'datos' | 'colecciones' | 'historial'>('datos');
+  const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
+  const [avatarMode, setAvatarMode] = useState<'default' | 'custom'>('default');
+  const [avatarError, setAvatarError] = useState('');
 
   useEffect(() => {
     setDraft({
       displayName: profileData?.displayName ?? '',
+      fullName: profileData?.fullName ?? '',
       bio: profileData?.bio ?? '',
       favoritePlatform: profileData?.favoritePlatform ?? '',
       favoriteGenre: profileData?.favoriteGenre ?? '',
-      favoriteGame: profileData?.favoriteGame ?? ''
+      favoriteGame: profileData?.favoriteGame ?? '',
+      avatarImage: profileData?.avatarImage ?? '',
+      avatarColor: profileData?.avatarColor ?? defaultAvatarColor
     });
+    setAvatarMode(profileData?.avatarImage ? 'custom' : 'default');
   }, [profileData]);
+
+  function handleAvatarFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 300 * 1024) {
+      setAvatarError('La imagen debe pesar menos de 300 KB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const avatarImage = typeof reader.result === 'string' ? reader.result : '';
+      const nextDraft = { ...draft, avatarImage };
+      setDraft(nextDraft);
+      setAvatarEditorOpen(false);
+      void onSave(nextDraft);
+      setAvatarError('');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function updateAvatar(avatarImage: string, avatarColor = draft.avatarColor) {
+    const nextDraft = { ...draft, avatarImage, avatarColor };
+    setDraft(nextDraft);
+    setAvatarEditorOpen(false);
+    void onSave(nextDraft);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -687,11 +826,38 @@ function ProfileView({ profileData, profileLoading, profileSaving, gamesById, sa
   return (
     <>
       <div className="profile-bubble-hero">
-        <div className="profile-bubble-large">{getProfileBubbleLabel(profileData ?? undefined, profileData?.displayName ?? null, profileData?.email ?? null)}</div>
-        <div>
+        <ProfileBubble className="profile-bubble-large" label={getProfileBubbleLabel(profileData ?? undefined, profileData?.displayName ?? null, profileData?.email ?? null)} image={draft.avatarImage} color={draft.avatarColor} />
+        <div className="profile-avatar-controls">
           <p className="auth-bottom-title">Burbuja de perfil</p>
           <p className="auth-description auth-description-login">{profileLoading ? 'Cargando tu perfil...' : 'Edita tus datos y gustos cuando quieras.'}</p>
           <p className="profile-counter">{savedGames.length} guardados · {favoriteGames.length} favoritos</p>
+          <div className="avatar-popup-anchor">
+            <button type="button" className="profile-avatar-edit" onClick={() => setAvatarEditorOpen((current) => !current)}>{avatarEditorOpen ? 'Cerrar opciones' : 'Editar burbuja'}</button>
+            {avatarEditorOpen ? (
+              <div className="avatar-editor" role="dialog" aria-label="Editar burbuja de perfil">
+                <p className="auth-bottom-title">Apariencia</p>
+                <div className="avatar-editor-modes">
+                  <button type="button" className={avatarMode === 'default' ? 'avatar-mode avatar-mode-active' : 'avatar-mode'} onClick={() => { setAvatarMode('default'); setDraft((current) => ({ ...current, avatarImage: '' })); }}>Por defecto</button>
+                  <button type="button" className={avatarMode === 'custom' ? 'avatar-mode avatar-mode-active' : 'avatar-mode'} onClick={() => setAvatarMode('custom')}>Imagen propia</button>
+                </div>
+                {avatarMode === 'default' ? (
+                  <div className="avatar-palette" role="group" aria-label="Paleta de perfil">
+                    {avatarPaletteRows.map((row, rowIndex) => <div className="avatar-palette-row" key={`avatar-row-${rowIndex}`}>{row.map((color) => <button type="button" key={color.value} className={`avatar-swatch${draft.avatarColor === color.value && !draft.avatarImage ? ' avatar-swatch-active' : ''}`} style={{ background: color.value }} onClick={() => updateAvatar('', color.value)} aria-label={`Usar color ${color.label}`} />)}</div>)}
+                  </div>
+                ) : (
+                  <div className="avatar-custom-fields">
+                    <input type="url" value={draft.avatarImage.startsWith('data:') ? '' : draft.avatarImage} onChange={(event) => setDraft((current) => ({ ...current, avatarImage: event.target.value }))} onBlur={(event) => updateAvatar(event.target.value)} placeholder="Pega un enlace de imagen" aria-label="Enlace de imagen de perfil" />
+                    <label className="avatar-file-label">
+                      <span>Seleccionar archivo</span>
+                      <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleAvatarFile} aria-label="Imagen de perfil del ordenador" />
+                    </label>
+                    {avatarError ? <p className="auth-status profile-avatar-error">{avatarError}</p> : null}
+                  </div>
+                )}
+                <button type="button" className="avatar-editor-close" onClick={() => setAvatarEditorOpen(false)}>Cerrar</button>
+              </div>
+            ) : null}
+            </div>
         </div>
       </div>
       <div className="profile-tabs" role="tablist" aria-label="Secciones de perfil">
@@ -704,6 +870,10 @@ function ProfileView({ profileData, profileLoading, profileSaving, gamesById, sa
           <label>
             <span>Nombre público</span>
             <input type="text" value={draft.displayName} onChange={(event) => setDraft((current) => ({ ...current, displayName: event.target.value }))} placeholder="Nombre público" aria-label="Nombre público" />
+          </label>
+          <label>
+            <span>Nombre personal</span>
+            <input type="text" value={draft.fullName} onChange={(event) => setDraft((current) => ({ ...current, fullName: event.target.value }))} placeholder="Nombre personal" aria-label="Nombre personal" />
           </label>
           <label>
             <span>Biografía</span>
@@ -730,13 +900,13 @@ function ProfileView({ profileData, profileLoading, profileSaving, gamesById, sa
           <div className="auth-bottom-block">
             <p className="auth-bottom-title">Guardados</p>
             <div className="profile-chip-list">
-              {savedGames.length ? savedGames.map((gameId) => <span key={gameId} className="profile-chip">{gamesById.get(gameId)?.name ?? gameId}</span>) : <p className="library-lock-copy">Todavía no has guardado ningún juego.</p>}
+              {savedGames.length ? savedGames.map((gameId) => <ProfileGameItem key={gameId} gameId={gameId} gamesById={gamesById} />) : <p className="library-lock-copy">Todavía no has guardado ningún juego.</p>}
             </div>
           </div>
           <div className="auth-bottom-block">
             <p className="auth-bottom-title">Favoritos</p>
             <div className="profile-chip-list">
-              {favoriteGames.length ? favoriteGames.map((gameId) => <span key={gameId} className="profile-chip">{gamesById.get(gameId)?.name ?? gameId}</span>) : <p className="library-lock-copy">Aún no tienes juegos favoritos.</p>}
+              {favoriteGames.length ? favoriteGames.map((gameId) => <ProfileGameItem key={gameId} gameId={gameId} gamesById={gamesById} />) : <p className="library-lock-copy">Aún no tienes juegos favoritos.</p>}
             </div>
           </div>
         </div>
@@ -746,13 +916,16 @@ function ProfileView({ profileData, profileLoading, profileSaving, gamesById, sa
         <div className="auth-bottom-block">
           <p className="auth-bottom-title">Historial reciente</p>
           <div className="profile-chip-list">
-            {recentlyViewedGames.length ? recentlyViewedGames.map((gameId) => <span key={gameId} className="profile-chip">{gamesById.get(gameId)?.name ?? gameId}</span>) : <p className="library-lock-copy">Aún no has abierto ningún juego.</p>}
+            {recentlyViewedGames.length ? recentlyViewedGames.map((gameId) => <ProfileGameItem key={gameId} gameId={gameId} gamesById={gamesById} />) : <p className="library-lock-copy">Aún no has abierto ningún juego.</p>}
           </div>
         </div>
       ) : null}
-      <div className="auth-links-bottom auth-links-bottom-dark">
-        <button type="button" className="auth-footer-link auth-footer-link-muted" onClick={onBack}>Volver</button>
-      </div>
+      {activeTab === 'datos' ? (
+        <div className="auth-links-bottom auth-links-bottom-dark profile-footer-actions">
+          <button type="button" className="auth-footer-link auth-footer-link-muted" onClick={onBack}>Volver</button>
+          <button type="button" className="profile-signout" onClick={onSignOut}>Cerrar sesión</button>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -796,23 +969,20 @@ function ForgotView({ auth, onScreenChange }: { auth: typeof firebaseAuth; onScr
       <div className="auth-links-bottom">
         <button type="button" className="auth-footer-link" onClick={() => onScreenChange('login')}>Iniciar sesión</button>
         <button type="button" className="auth-footer-link" onClick={() => onScreenChange('signup')}>Registro</button>
-        <button type="button" className="auth-footer-link" onClick={() => onScreenChange('cookies')}>Cookies</button>
       </div>
     </>
   );
 }
 
-function CookiesView({ onScreenChange }: { onScreenChange: (screen: AuthView) => void }) {
-  const [cookieConsent, setCookieConsent] = useState(false);
-
+function CookiesView({ onScreenChange, cookieConsent, onCookieConsentChange }: { onScreenChange: (screen: AuthView) => void; cookieConsent: boolean; onCookieConsentChange: (consent: boolean) => void; }) {
   return (
     <>
-      <p className="auth-description auth-description-login">Cookies técnicas para el acceso, preferencias de interfaz y, si quieres, analítica básica en el futuro.</p>
+      <p className="auth-description auth-description-login">Usamos cookies mínimas para recordar tu consentimiento y mantener una experiencia de acceso coherente.</p>
       <div className="cookie-screen cookie-screen-login">
         <div className="auth-bottom-block auth-bottom-block-full">
           <p className="auth-bottom-title">Cookies</p>
-          <p>Puedes mostrar aquí el aviso de cookies y dejar el control de consentimiento dentro de la pantalla de inicio de sesión.</p>
-          <button className={cookieConsent ? 'cookie-button cookie-button-active' : 'cookie-button'} type="button" onClick={() => setCookieConsent((current) => !current)}>
+          <p>Las cookies técnicas recuerdan tu decisión de consentimiento. Firebase Auth las necesita para mantener el acceso y la aplicación no activa publicidad ni analítica de terceros.</p>
+          <button className={cookieConsent ? 'cookie-button cookie-button-active' : 'cookie-button'} type="button" onClick={() => onCookieConsentChange(!cookieConsent)}>
             {cookieConsent ? 'Cookies aceptadas' : 'Aceptar cookies'}
           </button>
         </div>
@@ -820,7 +990,6 @@ function CookiesView({ onScreenChange }: { onScreenChange: (screen: AuthView) =>
       <div className="auth-links-bottom">
         <button type="button" className="auth-footer-link" onClick={() => onScreenChange('login')}>Iniciar sesión</button>
         <button type="button" className="auth-footer-link" onClick={() => onScreenChange('signup')}>Registro</button>
-        <button type="button" className="auth-footer-link" onClick={() => onScreenChange('forgot')}>¿Olvidaste tu contraseña?</button>
       </div>
     </>
   );
@@ -894,12 +1063,8 @@ function GameCard({ game, savedGames, favoriteGames, onOpenGame, onToggleSavedGa
   const isFavorite = favoriteGames.includes(game.id);
   return (
     <article className="game">
-      <div className="game-image">{game.background_image ? <img src={game.background_image} alt={`Portada de ${game.name}`} loading="lazy" /> : <div className="no-image">SIN PORTADA</div>}<span className="game-id">#{game.id}</span><div className="game-hover"><button type="button" className="game-hover-button" onClick={() => onOpenGame(game.id)}>Ver ficha</button><span aria-hidden="true">↗</span></div></div>
+      <div className="game-image">{game.background_image ? <img src={game.background_image} alt={`Portada de ${game.name}`} loading="lazy" /> : <div className="no-image">SIN PORTADA</div>}<span className="game-id">#{game.id}</span><div className="game-image-actions"><button type="button" className={isFavorite ? 'game-favorite game-favorite-active' : 'game-favorite'} onClick={() => onToggleFavoriteGame(game.id)} aria-label={isFavorite ? `Quitar ${game.name} de favoritos` : `Añadir ${game.name} a favoritos`} aria-pressed={isFavorite}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5S4 15.8 4 9.7C4 6.9 6 5 8.6 5c1.6 0 2.8.8 3.4 2  .6-1.2 1.8-2 3.4-2C18 5 20 6.9 20 9.7c0 6.1-8 10.8-8 10.8Z" /></svg></button><button type="button" className={isSaved ? 'game-saved game-saved-active' : 'game-saved'} onClick={() => onToggleSavedGame(game.id)} aria-label={isSaved ? `Quitar ${game.name} de guardados` : `Guardar ${game.name}`} aria-pressed={isSaved}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A2.5 2.5 0 0 1 8.5 2h7A2.5 2.5 0 0 1 18 4.5V22l-6-4-6 4V4.5Z" /></svg></button></div><div className="game-hover"><button type="button" className="game-hover-button" onClick={() => onOpenGame(game.id)}>Ver ficha</button><span aria-hidden="true">↗</span></div></div>
       <div className="game-body"><div><h3>{game.name}</h3><p>{game.released ?? 'Fecha desconocida'}</p></div><strong>{game.rating?.toFixed(1) ?? '—'}</strong></div>
-      <div className="game-actions">
-        <button type="button" className={isSaved ? 'game-pill game-pill-active' : 'game-pill'} onClick={() => onToggleSavedGame(game.id)}>{isSaved ? 'Guardado' : 'Guardar'}</button>
-        <button type="button" className={isFavorite ? 'game-pill game-pill-active' : 'game-pill'} onClick={() => onToggleFavoriteGame(game.id)}>{isFavorite ? 'Favorito' : 'Favorito +'}</button>
-      </div>
       <div className="platform-list">{game.platforms.slice(0, 3).map((item) => <span key={item}>{item}</span>)}</div>
     </article>
   );
