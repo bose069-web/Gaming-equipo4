@@ -7,6 +7,8 @@ dist/
 .firebase-debug.log
 *.log
 coverage/
+*.tsbuildinfo
 .DS_Store
 .vscode/settings.json
 service-account*.json
+credentials/
